@@ -1,3 +1,9 @@
 # Files to ignore #
 ###################
 *.pkl
+
+
+# But not these #
+###################
+!alignment_data.pkl
+!cluster_parameters5.pkl
