@@ -59,7 +59,7 @@ if __name__ == "__main__":
     membship = np.argmax(r_nk, axis=1)    
     
     ## Read checkerboard image and landmarks
-    #checkerboard = sio.loadmat('checkerboard.mat')
+    checkerboard = sio.loadmat('checkerboard.mat')
         
     new_images = [ ]
     cluster_idx = [ ]
@@ -68,15 +68,15 @@ if __name__ == "__main__":
             continue
         print k
         
-#        (eigVal, eigVec) = np.linalg.eig(np.linalg.pinv(v_k[k] * W_k[k].astype('float64')))
+        (eigVal, eigVec) = np.linalg.eig(np.linalg.pinv(v_k[k] * W_k[k].astype('float64')))
+        
+        img = np.array(checkerboard['image'], order='C')
+        landmarks = checkerboard['corners']
+        landmarks = np.reshape(landmarks, (300, 2), order='C').copy()
+        data.src = CpuGpuArray(landmarks)
 #        
-#        img = np.array(checkerboard['image'], order='C')
-#        landmarks = checkerboard['corners']
-#        landmarks = np.reshape(landmarks, (300, 2), order='C').copy()
-#        data.src = CpuGpuArray(landmarks)
-#        
-#        new_img, new_lm = generate_new_images(img, data.src, tw, eigVec[:,0], 1, 2* [math.sqrt(eigVal[0])])
-#        plt.imsave(arr=new_img[0], fname = 'cluster_directions_' + str(k) + '.png', cmap =plt.cm.gray)      
+        new_img, new_lm = generate_new_images(img, data.src, tw, eigVec[:,0], 1, 2* [math.sqrt(eigVal[0])])
+        plt.imsave(arr=new_img[0], fname = 'cluster_directions_' + str(k) + '.png', cmap =plt.cm.gray)      
 #        
 
         # Choose random image from this cluster
@@ -84,8 +84,8 @@ if __name__ == "__main__":
         img = imgs[r]
         landmarks = np.reshape(lm[r], (num_lm, 2), order='C').copy()
         data.src = CpuGpuArray(landmarks)
-#        theta = np.random.multivariate_normal(m_k[k].flatten().astype('float64'),
-#                    np.linalg.pinv(v_k[k]* W_k[k].astype('float64')))
+        theta = np.random.multivariate_normal(m_k[k].flatten().astype('float64'),
+                    np.linalg.pinv(v_k[k]* W_k[k].astype('float64')))
         theta = thetadata[np.random.choice(range(0, thetadata.shape[0]))]
         new_img, new_lm = generate_new_images(img, data.src, tw, theta, 1, 2* [1])
         plt.imsave(arr=new_img[0], fname = 'sample_' + str(k) + '.png')      
