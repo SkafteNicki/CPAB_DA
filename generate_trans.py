@@ -8,19 +8,45 @@ Description:
     comflic theano when using the gpu
 """
 #%% Packages to use
-from utils import generate_transformers, load_obj, f_exist, set_params
+from utils_func import load_obj, f_exist, set_params, save_obj
 import argparse
 import numpy as np
 from of.utils import *
 from of.gpu import CpuGpuArray
 from cpab.cpa2d.inference.transformation.TransformationFitter import TransformationFitter
 
+#%% Function for generating transformations
+def generate_transformers(n_trans, tw, m_k, v_k, W_k):
+    K = len(m_k)
+    pts_src = tw.pts_src_dense
+    pts_inv = CpuGpuArray.zeros_like(pts_src)
+    
+    trans = K * [ n_trans * [[]] ]    
+    for k in range(K):
+        print('Cluster {} / {}'.format(k,K))
+        for n in range(n_trans):        
+            theta = np.random.multivariate_normal(m_k[k].flatten().astype('float64'), 
+                                    np.linalg.pinv(v_k[k] * W_k[k].astype('float64')))
+        
+            cpa_space = tw.ms.L_cpa_space[-1]
+            cpa_space.theta2Avees(theta=theta)
+            cpa_space.update_pat()
+            tw.update_pat_from_Avees(level=-1)
+            
+            ## Transform object
+            tw.calc_T_inv(pts_src, pts_inv, level=-1, int_quality=1)
+            pts_inv.gpu2cpu()
+            trans[k][n] = pts_inv.cpu.copy()
+            
+    save_obj(trans, 'transformations')
+
+
 #%% Main script
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''This program will generate a
             number of transformations such that we do not comflict theano with 
             the gpu''')
-    parser.add_argument('-nt', action="store", dest="n_trans", type = int, default = 100,
+    parser.add_argument('-nt', action="store", dest="n_trans", type = int, default = 10000,
                         help = '''Number of transformations generated per cluster''')
     res = parser.parse_args()
     

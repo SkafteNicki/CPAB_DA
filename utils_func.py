@@ -17,7 +17,7 @@ import sys
 import contextlib
 import numpy as np
 from of.gpu import CpuGpuArray
-import cv2
+#import cv2
 
 #%% Parameter settings for generating transformations
 def set_params():
