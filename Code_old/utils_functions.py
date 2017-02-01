@@ -64,19 +64,17 @@ def load_lfw(num_lm):
     return imgs, index, landmarks, attribute_names, attributes
 
 #%% Function for generating new images
-def generate_new_images(img, landmarks, tw, theta, num_new_imgs, theta_gen_scale):
+def generate_new_images(img, tw, theta, num_new_imgs, theta_gen_scale):
     pts_src = tw.pts_src_dense
     pts_inv = CpuGpuArray.zeros_like(pts_src)
 
     cpa_space = tw.ms.L_cpa_space[-1]
     img_src = CpuGpuArray(img)
     img_fwd = CpuGpuArray.zeros_like(img_src)
-    lm_fwd  = CpuGpuArray.zeros_like(landmarks)
     
     ## Compute pixel mapping
     t = np.linspace(theta_gen_scale[0], theta_gen_scale[1], num_new_imgs)
     new_images = [img]
-    new_landmarks = [landmarks]
     for k in range(1, num_new_imgs):
         ## Set theta
         theta_k = t[k] * theta
@@ -90,12 +88,7 @@ def generate_new_images(img, landmarks, tw, theta, num_new_imgs, theta_gen_scale
         img_fwd.gpu2cpu()
         new_images.append(img_fwd.cpu.copy())
 
-        ## Transform landmarks
-        tw.calc_T_fwd(landmarks, lm_fwd, level=-1)
-        lm_fwd.gpu2cpu()
-        new_landmarks.append(lm_fwd.cpu.copy())
-
-    return new_images, new_landmarks
+    return new_images
 
 #%% Set parameters function
 def set_params():
