@@ -1,181 +1,137 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created on Fri Jan 27 15:25:02 2017
+Created on Tue Jan 31 13:00:42 2017
 
-@author: nicki
+@author: Nicki
 """
+
 #%%
-import tensorflow as tf
-import tflearn
+import tflearn as tfl
+import h5py
+import argparse
 import numpy as np
+from datetime import datetime
 import time
-import math
-from utils_func import load_lfw, load_obj
-
 #%%
-def create_net(shape, batch_size):
-    images_L = tf.placeholder(tf.float32, shape=(shape), name='L')
-    images_R = tf.placeholder(tf.float32, shape=(shape), name='R')
-    labels =   tf.placeholder(tf.float32, shape=([None,1]), name='gt')
-    dropout_f = tf.placeholder("float")
-
-    def build_net(images, dropout_rate):
-        net = tflearn.conv_2d(images, 32, 3, activation='relu')
-        net = tflearn.max_pool_2d(net, 2)
-        net = tflearn.local_response_normalization(net)
-        net = tflearn.dropout(net, dropout_rate)
-        net = tflearn.conv_2d(net, 64, 3, activation='relu')
-        net = tflearn.max_pool_2d(net, 2)
-        net = tflearn.local_response_normalization(net)
-        net = tflearn.dropout(net, dropout_rate)
-        net = tflearn.fully_connected(net, 128, activation='tanh')
-        net = tflearn.dropout(net, dropout_rate)
-        net = tflearn.fully_connected(net, 128, activation='tanh')
-        net = tflearn.dropout(net, dropout_rate)
-        return net    
-    
-    def contrastive_loss(y,d):
-        tmp= y * tf.square(d)
-        tmp2 = (1-y) *tf.square(tf.maximum((1 - d),0))
-        return tf.reduce_sum(tmp +tmp2)/batch_size/2
-    
-
-    with tf.variable_scope("siemese"):
-        model1 = build_net(images_L, dropout_f)
-        tf.get_variable_scope().reuse_variables()
-        model2 = build_net(images_R, dropout_f)
-    
-    distance  = tf.sqrt(tf.reduce_sum(tf.pow(tf.sub(model1,model2),2),1,keep_dims=True))
-    loss = contrastive_loss(labels,distance)
-    optimizer = tf.train.AdamOptimizer(learning_rate = 0.0001).minimize(loss)
-
-    return optimizer, loss, distance
+def save_obj(obj, name):
+    import pickle as pkl
+    with open(name + '.pkl', 'wb') as f:
+        pkl.dump(obj, f, pkl.HIGHEST_PROTOCOL)
 #%%
-def compute_accuracy(prediction,labels):
-    return labels[prediction.ravel() < 0.5].mean()
-
+def tower_network(reuse = False):
+    net = tfl.input_data(shape = (None, 250, 250, 3))
+    
+    net = tfl.conv_2d(net, 32, 3, activation = 'relu', reuse = reuse, scope = 'conv1')
+    net = tfl.max_pool_2d(net, 2, strides = 2)
+    net = tfl.batch_normalization(net)
+#    net = tfl.dropout(net, 0.5)
+    
+    net = tfl.conv_2d(net, 32, 3, activation = 'relu', reuse = reuse, scope = 'conv2')
+    net = tfl.max_pool_2d(net, 2, strides = 2)
+    net = tfl.batch_normalization(net)
+#    net = tfl.dropout(net, 0.5)
+    
+    net = tfl.fully_connected(net, 512, activation = 'relu', reuse = reuse, scope = 'fc1')
+#    net = tfl.dropout(net, 0.5)
+    
+    return net
+#%%    
+def similarity_network(tower1, tower2):
+    num_classes = 2
+    # Marge layer
+    net = tfl.merge([tower1, tower2], mode = 'concat', axis = 1, name = 'Merge')
+    
+    # Decision network
+    net = tfl.fully_connected(net, 2048, activation = 'relu')
+    net = tfl.dropout(net, 0.5)
+    net = tfl.fully_connected(net, 2048, activation = 'relu')
+    net = tfl.dropout(net, 0.5)
+    
+    # Softmax layer
+    net = tfl.fully_connected(net, num_classes, activation = 'softmax')
+    
+    return net
 #%%
-def create_img_pairs(imgs, index, pairs):
-    # Reshape into data structure for network
-    X_train = np.zeros(shape=(len(pairs['train']), 2, 250, 250, 3), dtype=np.uint8)
-    y_train = np.zeros(shape=(len(pairs['train'])), dtype=np.uint8)
-    count = 0    
-    for n in np.random.permutation(len(pairs['train'])):
-        X_train[count,0] = imgs[index[pairs['train'][n][0]][pairs['train'][n][1]-1]]
-        X_train[count,1] = imgs[index[pairs['train'][n][2]][pairs['train'][n][3]-1]]
-        y_train[count] = 1 if pairs['train'][n][0] == pairs['train'][n][2] else 0
-        count += 1        
-        
-    X_val = np.zeros(shape=(len(pairs['val']), 2, 250, 250, 3), dtype=np.uint8)    
-    y_val = np.zeros(shape=(len(pairs['val'])), dtype=np.uint8)
-    count = 0
-    for n in np.random.permutation(len(pairs['val'])):
-        X_val[count,0] = imgs[index[pairs['val'][n][0]][pairs['val'][n][1]-1]]
-        X_val[count,1] = imgs[index[pairs['val'][n][2]][pairs['val'][n][3]-1]]
-        y_val[count] = 1 if pairs['val'][n][0] == pairs['val'][n][2] else 0
-        count += 1
-        
-    X_test = np.zeros(shape=(10, len(pairs['test'][0]), 2, 250, 250, 3), dtype=np.uint8)
-    y_test = np.zeros(shape=(10, len(pairs['test'][0])), dtype=np.uint8)
-    for i in range(10):
-        count = 0
-        for n in np.random.permutation(len(pairs['test'][i])):
-            X_test[i,count,0] = imgs[index[pairs['test'][i][n][0]][pairs['test'][i][n][1]-1]]
-            X_test[i,count,1] = imgs[index[pairs['test'][i][n][2]][pairs['test'][i][n][3]-1]]   
-            y_test[i,count] = 1 if pairs['test'][i][n][0] == pairs['test'][i][n][2] else 0
-            count += 1
-    return X_train, y_train, X_val, y_val, X_test, y_test 
-
-#%% Main script
 if __name__ == '__main__':
-    # Load lfw data
-    imgs, index, landmarks, pairs = load_lfw()
-
-    # Load estimated cluster parameters    
-    _, _, _, Nk, _ = load_obj('cluster_data/cluster_parameters_processed') 
-    
-    # Create data
-    print("Creating data")
-    X_train, y_train, X_val, y_val, X_test, y_test = create_img_pairs(imgs, index, pairs)
-
     # Parameters
-    # TODO: Change to argparser
-    augment_type = 0
-    batch_size = 20
-    n_epochs = 300
+    parser = argparse.ArgumentParser(description='''This program will train a 
+                siamese convolutional neural network on the lfw dataset.''')
+    parser.add_argument('-at', action="store", dest="augment_type", type = int, default = 0,
+                        help = '''Augmentation type. 0=no augmentation, 1=normal augmentation
+                                ,2=cpab augmentation''')
+    parser.add_argument('-lr', action="store", dest="learning_rate", type=float, default = 0.000001,
+                        help = '''Learning rate for optimizer''')
+    parser.add_argument('-ne', action="store", dest="num_epochs", type=int, default = 10,
+                        help = '''Number of epochs''')
+    parser.add_argument('-bs', action="store", dest="batch_size", type=int, default = 100,
+                        help = '''Batch size''')
+    res = parser.parse_args()
     
-    # Load presampled transformations
-    #trans = load_obj('transformations')
+    augment_type = res.augment_type
+    learning_rate = res.learning_rate
+    num_epochs = res.num_epochs
+    batch_size = res.batch_size
+    print("Fitting siamese network with parameters")
+    print("    with augmentation type: ", augment_type)
+    print("    with learning rate:     ", learning_rate)
+    print("    with batch size:        ", batch_size)  
+    print("    in number of epochs:    ", num_epochs)
     
-    def get_batch_no_augmentation(idx, batch_size):
-        return (X_train[(idx*batch_size):((idx+1)*batch_size), 0], 
-                X_train[(idx*batch_size):((idx+1)*batch_size), 1],
-                y_train[(idx*batch_size):((idx+1)*batch_size)])
-    def get_batch_normal_augmentation(idx, batch_size):
-        return (None, None, None)
-    def get_batch_cpab_augmentation(idx, batch_size):
-        return (None, None, None)
-    def get_batch(augment_type, idx, batch_size):
-        return {0: get_batch_no_augmentation(idx, batch_size),
-                1: get_batch_normal_augmentation(idx, batch_size),
-                2: get_batch_cpab_augmentation(idx, batch_size)
-                }[augment_type]
+    # Load data ....
+    if augment_type == 0:
+        h5f = h5py.File('lfw_augment_no.h5', 'r')
+    elif augment_type == 1:
+        h5f = h5py.File('lfw_augment_normal.h5', 'r')
+    elif augment_type == 2:
+        h5f = h5py.File('lfw_augment_cpab.h5', 'r')
+    else:
+        ValueError('Set augment type to 0, 1 or 2')
     
+    X_train = h5f['X_train']
+    y_train = h5f['y_train']
+    X_val = h5f['X_val']
+    y_val = h5f['y_val']
+    X_test = h5f['X_test']
+    y_test = h5f['y_test']
     
-    # Launch graph
-    with tf.Session() as sess:
-        tf.global_variables_initializer().run()
-#        global_step = tf.Variable(0,trainable=False)
-#        images_L = tf.placeholder(tf.float32,shape=([None,784]),name='L')
-#        images_R = tf.placeholder(tf.float32,shape=([None,784]),name='R')
-#        labels = tf.placeholder(tf.float32,shape=([None,1]),name='gt')
-#        dropout_f = tf.placeholder("float")
-#    
-#        def mlp(input_,input_dim,output_dim,name="mlp"):
-#            with tf.variable_scope(name):
-#                w = tf.get_variable('w',[input_dim,output_dim],tf.float32,tf.random_normal_initializer(mean = 0.001,stddev=0.02))
-#                return tf.nn.relu(tf.matmul(input_,w))
-#        
-#        def mlpnet(image,_dropout):
-#            l1 = mlp(image,784,128,name='l1')
-#            l1 = tf.nn.dropout(l1,_dropout)
-#            l2 = mlp(l1,128,128,name='l2')
-#            l2 = tf.nn.dropout(l2,_dropout)
-#            l3 = mlp(l2,128,128,name='l3')
-#            return l3
-#        
-#        def build_model_mlp(X_,_dropout):
-#
-#            model = mlpnet(X_,_dropout)
-#            return model
-#    
-#        with tf.variable_scope("siamese") as scope:
-#            model1= build_model_mlp(images_L,dropout_f)
-#            scope.reuse_variables()
-#            model2 = build_model_mlp(images_R,dropout_f)
+    # Tower networks
+    net1 = tower_network(reuse = False)
+    net2 = tower_network(reuse = True)
     
-        # Create network
-        print("Setting up network")
-        optimizer, loss, distance = create_net([None, 250, 250, 3], batch_size)
-#    
-#        # Training cycle
-#        for epoch in range(30):
-#            avg_loss = 0.0
-#            avg_acc = 0.0
-#            total_num_batches = int(X_train.shape[0] / batch_size)
-#            start_time = time.time()
-#            for i in range(total_num_batches):
-#                input1, input2, y = get_batch(augment_type, i)
-#                _, loss_value, predict = sess.run([optimizer, loss, distance],
-#                                                  feed_dict = {images_L:  input1,
-#                                                               images_R:  input2,
-#                                                               labels:    y,
-#                                                               dropout_r: 0.5})
-#                tr_acc = compute_accuracy(predict, y)
-#                if math.isnan(tr_acc) and epoch != 0:
-#                    print('tr_acc %0.2f' % tr_acc)
-#                    avg_loss += loss_value
-#                    avg_acc += tr_acc * 100
-#                    duration = time.time() - start_time
+    # Similarity network
+    net = similarity_network(net1, net2)
     
+    # Learning algorithm
+    net = tfl.regression(net, 
+                         optimizer = 'adam', 
+                         learning_rate = learning_rate,
+                         loss = 'categorical_crossentropy', 
+                         name = 'target')
+    
+    # Training
+    model = tfl.DNN(net, tensorboard_verbose = 0,
+                    tensorboard_dir='/home/nicki/Documents/CPAB_data_augmentation/network_res/')
+    '''
+    tensorboard_verbose:
+        0: Loss, Accuracy (Best Speed).
+        1: Loss, Accuracy, Gradients.
+        2: Loss, Accuracy, Gradients, Weights.
+        3: Loss, Accuracy, Gradients, Weights, Activations, Sparsity.(Best visualization)
+    '''
+    uniq_id = datetime.now().strftime('%Y_%m_%d_%H_%M')
+    start_time = time.time()
+    model.fit(  [X_train[:,0], X_train[:,1]], tfl.data_utils.to_categorical(y_train,2), 
+                validation_set = ([X_val[:,0], X_val[:,1]], tfl.data_utils.to_categorical(y_val,2)),
+                n_epoch = num_epochs,
+                show_metric = True,
+                batch_size = batch_size,
+                run_id = 'lfw_' + str(augment_type) + '_' + uniq_id)
+    end_time = time.time()
+    # Do final test evaluation
+    score=10*[0]
+    for i in range(10):
+        score[i] = model.evaluate([X_test[i,:,0], X_test[i,:,1]], tfl.data_utils.to_categorical(y_test[i],2))[0]
+    print('Mean test acc.: ', np.mean(score), '+-', np.round(np.std(score),3))
+    save_obj({'test_score': score, 'time': end_time - start_time}, 'network_res/' + 'lfw_' + str(augment_type) + '_' + uniq_id)
+    
+    # Close file
+    h5f.close()

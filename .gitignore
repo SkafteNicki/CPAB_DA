@@ -1,3 +1,4 @@
 datasets/
 transformations.pkl
+network_res/
 *.h5
