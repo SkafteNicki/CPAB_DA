@@ -34,8 +34,8 @@ if __name__ == '__main__':
     #%%
     n_scaling = 5
     h5f = h5py.File('lfw_augment_normal.h5', 'w')
-    h5f.create_dataset('X_train', ((n_scaling+1)*X_train.shape[0], 2, 250, 250, 3))
-    h5f.create_dataset('y_train', ((n_scaling+1)*y_train.shape[0],))
+    h5f.create_dataset('X_train', ((n_scaling+1)*X_train.shape[0], 2, 250, 250, 3), dtype='uint8')
+    h5f.create_dataset('y_train', ((n_scaling+1)*y_train.shape[0],), dtype='uint8')
     h5f.create_dataset('X_val', data = X_val)
     h5f.create_dataset('y_val', data = y_val)
     h5f.create_dataset('X_test', data = X_test)
@@ -68,9 +68,10 @@ if __name__ == '__main__':
     
     h5f.close()
     #%%
+    n_scaling = 50
     h5f = h5py.File('lfw_augment_cpab.h5', 'w')
-    h5f.create_dataset('X_train', ((n_scaling+1)*X_train.shape[0], 2, 250, 250, 3))
-    h5f.create_dataset('y_train', ((n_scaling+1)*y_train.shape[0], ))
+    h5f.create_dataset('X_train', ((n_scaling+1)*X_train.shape[0], 2, 250, 250, 3), dtype='uint8')
+    h5f.create_dataset('y_train', ((n_scaling+1)*y_train.shape[0], ), dtype='uint8')
     h5f.create_dataset('X_val', data = X_val)
     h5f.create_dataset('y_val', data = y_val)
     h5f.create_dataset('X_test', data = X_test)
@@ -107,11 +108,11 @@ if __name__ == '__main__':
     tw = tf.tw    
     
     # Cluster parameters
-    m_k, W_k, v_k, Nk, r_nk = load_obj('cluster_data/cluster_parameters_processed')
+    m_k, W_k, v_k, Nk, r_nk = load_obj('cluster_data/cluster_parameters')
     K = len(Nk) # number of clusters
     pri = Nk / sum(Nk)
     for idx in range(X_train.shape[0]):
-        if idx % 10 == 0: print idx
+        if idx % 100 == 0: print(idx)
         i = (n_scaling+1)*idx
         # Get images and target
         im1 = X_train[idx,0]

@@ -20,18 +20,13 @@ def save_obj(obj, name):
 def tower_network(reuse = False):
     net = tfl.input_data(shape = (None, 250, 250, 3))
     
-    net = tfl.conv_2d(net, 32, 3, activation = 'relu', reuse = reuse, scope = 'conv1')
+    net = tfl.conv_2d(net, 32, 3, strides = 2, activation = 'tanh', reuse = reuse, scope = 'conv1')
     net = tfl.max_pool_2d(net, 2, strides = 2)
     net = tfl.batch_normalization(net)
-#    net = tfl.dropout(net, 0.5)
+#    net = tfl.dropout(net, 0.8)
     
-    net = tfl.conv_2d(net, 32, 3, activation = 'relu', reuse = reuse, scope = 'conv2')
-    net = tfl.max_pool_2d(net, 2, strides = 2)
-    net = tfl.batch_normalization(net)
-#    net = tfl.dropout(net, 0.5)
-    
-    net = tfl.fully_connected(net, 512, activation = 'relu', reuse = reuse, scope = 'fc1')
-#    net = tfl.dropout(net, 0.5)
+    net = tfl.fully_connected(net, 1024, activation = 'tanh', reuse = reuse, scope = 'fc1', regularizer = 'L2')
+#    net = tfl.dropout(net, 0.8)
     
     return net
 #%%    
@@ -41,10 +36,10 @@ def similarity_network(tower1, tower2):
     net = tfl.merge([tower1, tower2], mode = 'concat', axis = 1, name = 'Merge')
     
     # Decision network
-    net = tfl.fully_connected(net, 2048, activation = 'relu')
-    net = tfl.dropout(net, 0.5)
-    net = tfl.fully_connected(net, 2048, activation = 'relu')
-    net = tfl.dropout(net, 0.5)
+ #   net = tfl.fully_connected(net, 1024, activation = 'tanh', regularizer = 'L2')
+    #net = tfl.dropout(net, 0.5)
+#    net = tfl.fully_connected(net, 1024, activation = 'tanh', regularizer = 'L2')
+    #net = tfl.dropout(net, 0.5)
     
     # Softmax layer
     net = tfl.fully_connected(net, num_classes, activation = 'softmax')
@@ -71,10 +66,10 @@ if __name__ == '__main__':
     num_epochs = res.num_epochs
     batch_size = res.batch_size
     print("Fitting siamese network with parameters")
-    print("    with augmentation type: ", augment_type)
-    print("    with learning rate:     ", learning_rate)
-    print("    with batch size:        ", batch_size)  
-    print("    in number of epochs:    ", num_epochs)
+    print("    with augmentation type: " + str(augment_type))
+    print("    with learning rate:     " + str(learning_rate))
+    print("    with batch size:        " + str(batch_size))  
+    print("    in number of epochs:    " + str(num_epochs))
     
     # Load data ....
     if augment_type == 0:
