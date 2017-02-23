@@ -8,39 +8,38 @@ Created on Tue Jan 31 13:00:42 2017
 import tflearn as tfl
 import h5py
 import argparse
-import numpy as np
 from datetime import datetime
 import time
 #%%
-def save_obj(obj, name):
-    import pickle as pkl
-    with open(name + '.pkl', 'wb') as f:
-        pkl.dump(obj, f, pkl.HIGHEST_PROTOCOL)
-#%%
-def tower_network(reuse = False):
-    net = tfl.input_data(shape = (None, 250, 250, 3))
+def tower_network(reuse = False, wd = 0.001):
+    net = tfl.input_data(shape = (None, 125, 125, 3))
     
-    net = tfl.conv_2d(net, 32, 3, strides = 2, activation = 'tanh', reuse = reuse, scope = 'conv1')
-    net = tfl.max_pool_2d(net, 2, strides = 2)
+    net = tfl.conv_2d(net, 32, 11, activation = 'relu', reuse = reuse, 
+                      scope = 'conv1', weight_decay = wd)
+    net = tfl.max_pool_2d(net, 3)
     net = tfl.batch_normalization(net)
-#    net = tfl.dropout(net, 0.8)
     
-    net = tfl.fully_connected(net, 1024, activation = 'tanh', reuse = reuse, scope = 'fc1', regularizer = 'L2')
-#    net = tfl.dropout(net, 0.8)
+    net = tfl.conv_2d(net, 16, 9, activation = 'relu', reuse = reuse, 
+                      scope = 'conv2', weight_decay = wd)
+    net = tfl.max_pool_2d(net, 2)
+    net = tfl.batch_normalization(net)
+    
+    net = tfl.fully_connected(net, 1024, activation = 'relu', reuse = reuse, 
+                              scope = 'fc1', weight_decay = wd)
     
     return net
 #%%    
-def similarity_network(tower1, tower2):
+def similarity_network(tower1, tower2, wd = 0.001):
     num_classes = 2
     # Marge layer
     net = tfl.merge([tower1, tower2], mode = 'concat', axis = 1, name = 'Merge')
     
     # Decision network
- #   net = tfl.fully_connected(net, 1024, activation = 'tanh', regularizer = 'L2')
-    #net = tfl.dropout(net, 0.5)
-#    net = tfl.fully_connected(net, 1024, activation = 'tanh', regularizer = 'L2')
-    #net = tfl.dropout(net, 0.5)
-    
+    net = tfl.fully_connected(net, 1024, activation = 'relu', regularizer = 'L2',
+                              scope = 'fc2', weight_decay = wd)
+    net = tfl.fully_connected(net, 1024, activation = 'relu', regularizer = 'L2',
+                              scope = 'fc3', weight_decay = wd)
+#    
     # Softmax layer
     net = tfl.fully_connected(net, num_classes, activation = 'softmax')
     
@@ -59,74 +58,67 @@ if __name__ == '__main__':
                         help = '''Number of epochs''')
     parser.add_argument('-bs', action="store", dest="batch_size", type=int, default = 100,
                         help = '''Batch size''')
+    parser.add_argument('-wd', action="store", dest="weight_decay", type=float, default = 0.0001,
+                        help = '''Weight decay''')
     res = parser.parse_args()
     
     augment_type = res.augment_type
     learning_rate = res.learning_rate
     num_epochs = res.num_epochs
     batch_size = res.batch_size
+    weight_decay = res.weight_decay
+    
     print("Fitting siamese network with parameters")
     print("    with augmentation type: " + str(augment_type))
     print("    with learning rate:     " + str(learning_rate))
-    print("    with batch size:        " + str(batch_size))  
+    print("    with batch size:        " + str(batch_size))
+    print("    with weight decay:      " + str(weight_decay))
     print("    in number of epochs:    " + str(num_epochs))
     
     # Load data ....
     if augment_type == 0:
-        h5f = h5py.File('lfw_augment_no.h5', 'r')
-    elif augment_type == 1:
-        h5f = h5py.File('lfw_augment_normal.h5', 'r')
-    elif augment_type == 2:
-        h5f = h5py.File('lfw_augment_cpab.h5', 'r')
-    else:
-        ValueError('Set augment type to 0, 1 or 2')
-    
+        h5f = h5py.File('datasets/lfw_augment_no_cv_0.h5', 'r')
+#    elif augment_type == 1:
+#        h5f = h5py.File('lfw_augment_normal.h5', 'r')
+#    elif augment_type == 2:
+#        h5f = h5py.File('lfw_augment_cpab.h5', 'r')
+#    else:
+#        ValueError('Set augment type to 0, 1 or 2')
+#    
     X_train = h5f['X_train']
     y_train = h5f['y_train']
-    X_val = h5f['X_val']
-    y_val = h5f['y_val']
     X_test = h5f['X_test']
     y_test = h5f['y_test']
     
     # Tower networks
-    net1 = tower_network(reuse = False)
-    net2 = tower_network(reuse = True)
+    net1 = tower_network(reuse = False, wd = weight_decay)
+    net2 = tower_network(reuse = True, wd = weight_decay)
     
     # Similarity network
-    net = similarity_network(net1, net2)
+    net = similarity_network(net1, net2, wd = weight_decay)
     
     # Learning algorithm
     net = tfl.regression(net, 
                          optimizer = 'adam', 
                          learning_rate = learning_rate,
                          loss = 'categorical_crossentropy', 
-                         name = 'target')
+                         name = 'target',
+                         to_one_hot = True,
+                         n_classes = 2)
     
     # Training
-    model = tfl.DNN(net, tensorboard_verbose = 0,
+    model = tfl.DNN(net, tensorboard_verbose = 3,
                     tensorboard_dir='/home/nicki/Documents/CPAB_data_augmentation/network_res/')
-    '''
-    tensorboard_verbose:
-        0: Loss, Accuracy (Best Speed).
-        1: Loss, Accuracy, Gradients.
-        2: Loss, Accuracy, Gradients, Weights.
-        3: Loss, Accuracy, Gradients, Weights, Activations, Sparsity.(Best visualization)
-    '''
+    
     uniq_id = datetime.now().strftime('%Y_%m_%d_%H_%M')
     start_time = time.time()
-    model.fit(  [X_train[:,0], X_train[:,1]], tfl.data_utils.to_categorical(y_train,2), 
-                validation_set = ([X_val[:,0], X_val[:,1]], tfl.data_utils.to_categorical(y_val,2)),
+    model.fit(  [X_train[:,0], X_train[:,1]], y_train, 
+                validation_set = ([X_test[:,0], X_test[:,1]], y_test),
                 n_epoch = num_epochs,
                 show_metric = True,
                 batch_size = batch_size,
                 run_id = 'lfw_' + str(augment_type) + '_' + uniq_id)
     end_time = time.time()
-    # Do final test evaluation
-    score=10*[0]
-    for i in range(10):
-        score[i] = model.evaluate([X_test[i,:,0], X_test[i,:,1]], tfl.data_utils.to_categorical(y_test[i],2))[0]
-    print('Mean test acc.: ', np.mean(score), '+-', np.round(np.std(score),3))
-    save_obj({'test_score': score, 'time': end_time - start_time}, 'network_res/' + 'lfw_' + str(augment_type) + '_' + uniq_id)
-    
+        
     # Close file
     h5f.close()

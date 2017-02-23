@@ -1,0 +1,103 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Feb 10 11:32:42 2017
+
+@author: nicki
+"""
+
+##%%
+#def create_img_pairs(imgs, index, pairs, N_train=5000):
+#    # Reshape into data structure for network
+#    X_train = np.zeros(shape = (N_train, 2, 125, 125, 3), dtype = np.uint8)
+#    y_train = np.zeros(shape = (N_train, ), dtype = np.uint8)
+#    
+#    count = 0    
+#    for n in np.random.permutation(len(pairs['train'])):
+#        X_train[count,0] = imgs[index[pairs['train'][n][0]][pairs['train'][n][1]-1]]
+#        X_train[count,1] = imgs[index[pairs['train'][n][2]][pairs['train'][n][3]-1]]
+#        y_train[count] = 1 if pairs['train'][n][0] == pairs['train'][n][2] else 0
+#        count += 1
+#    
+#    # Sample remaining from outside
+#    N_rest = N_train - len(pairs['train'])
+#    lookup_set = set(chain(pairs['train'], pairs['val']))
+#    for i in range(10):
+#        lookup_set.update(pairs['test'][i])
+#    
+#    count_pos = 0
+#    while count_pos < N_rest / 2:
+#        print(count_pos)
+#        name = random.choice(index.keys())
+#        if len(index[name]) < 2: # not a person with enough images
+#            continue
+#        i,j = random.sample(index[name], 2)
+#        if ((name, i, name, j) not in lookup_set and
+#            (name, j, name, i) not in lookup_set):
+#            lookup_set.add((name, i, name, j))
+#            X_train[count, 0] = imgs[i]
+#            X_train[count, 1] = imgs[j]
+#            y_train[count] = 1
+#            count_pos += 1
+#            count += 1
+#    
+#    count_neg = 0
+#    while count_neg < N_rest / 2:
+#        print(count_neg)
+#        name1, name2 = random.choice(index.keys()), random.choice(index.keys())
+#        if name1 == name2:
+#            continue
+#        i = random.sample(index[name1], 1)[0]
+#        j = random.sample(index[name2], 1)[0]
+#        if ((name1, i, name2, j) not in lookup_set and
+#            (name2, j, name1, i) not in lookup_set):
+#            lookup_set.add((name1, i, name2, j))
+#            X_train[count, 0] = imgs[i]
+#            X_train[count, 1] = imgs[j]
+#            y_train[count] = 0
+#            count_neg += 1
+#            count += 1
+#    # Permute training
+#    perm = np.random.permutation(N_train)
+#    X_train = X_train[perm]
+#    y_train = y_train[perm]            
+#            
+#    X_val = np.zeros(shape=(len(pairs['val']), 2, 125, 125, 3), dtype=np.uint8)    
+#    y_val = np.zeros(shape=(len(pairs['val'])), dtype=np.uint8)
+#    count = 0
+#    for n in np.random.permutation(len(pairs['val'])):
+#        X_val[count,0] = imgs[index[pairs['val'][n][0]][pairs['val'][n][1]-1]]
+#        X_val[count,1] = imgs[index[pairs['val'][n][2]][pairs['val'][n][3]-1]]
+#        y_val[count] = 1 if pairs['val'][n][0] == pairs['val'][n][2] else 0
+#        count += 1
+#        
+#    X_test = np.zeros(shape=(10, len(pairs['test'][0]), 2, 125, 125, 3), dtype=np.uint8)
+#    y_test = np.zeros(shape=(10, len(pairs['test'][0])), dtype=np.uint8)
+#    for i in range(10):
+#        count = 0
+#        for n in np.random.permutation(len(pairs['test'][i])):
+#            X_test[i,count,0] = imgs[index[pairs['test'][i][n][0]][pairs['test'][i][n][1]-1]]
+#            X_test[i,count,1] = imgs[index[pairs['test'][i][n][2]][pairs['test'][i][n][3]-1]]   
+#            y_test[i,count] = 1 if pairs['test'][i][n][0] == pairs['test'][i][n][2] else 0
+#            count += 1
+#    
+#    return X_train, y_train, X_val, y_val, X_test, y_test 
+#
+##%%
+#if __name__ == '__main__':
+#    imgs, index, _, pairs = load_lfw()
+#    imgs_temp = np.zeros((13233, 125, 125, 3), dtype = np.uint8)
+#    for idx in range(imgs.shape[0]):
+#        imgs_temp[idx] = zoom(imgs[idx], (0.5, 0.5, 1), order = 3)
+#    imgs = imgs_temp
+#    
+#    X_train, y_train, X_val, y_val, X_test, y_test = create_img_pairs(imgs, index, pairs, N_train=5000)
+#    
+#    h5f = h5py.File('lfw_augment_no_large.h5', 'w')
+#    h5f.create_dataset('X_train', data = X_train)
+#    h5f.create_dataset('y_train', data = y_train)
+#    h5f.create_dataset('X_val', data = X_val)
+#    h5f.create_dataset('y_val', data = y_val)
+#    h5f.create_dataset('X_test', data = X_test)
+#    h5f.create_dataset('y_test', data = y_test)
+#    h5f.close()

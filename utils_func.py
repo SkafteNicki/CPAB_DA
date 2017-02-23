@@ -16,7 +16,10 @@ import random
 import sys
 import contextlib
 import numpy as np
-from of.gpu import CpuGpuArray
+try: # when using a python 3.5 inviroment the other functions can still be loaded
+    from of.gpu import CpuGpuArray
+except:
+    pass
 import cv2
 
 #%% Parameter settings for generating transformations

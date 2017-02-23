@@ -1,4 +1,6 @@
 datasets/
 transformations.pkl
 network_res/
+network_res2/
+best_model/
 *.h5
