@@ -21,6 +21,7 @@ try: # when using a python 3.5 inviroment the other functions can still be loade
 except:
     pass
 import cv2
+from scipy.ndimage.interpolation import zoom
 
 #%% Parameter settings for generating transformations
 def set_params():
@@ -138,7 +139,6 @@ def generate_new_images(img, tw, theta, num_new_imgs, theta_gen_scale):
     ## Compute pixel mapping
     theta_span = np.linspace(theta_gen_scale[0], theta_gen_scale[1], num_new_imgs)
     new_images = [ ]
-    new_landmarks = [ ]
     for t in theta_span:
         ## Set theta
         theta_k = t * theta
@@ -184,3 +184,15 @@ def create_img_pairs(imgs, index, pairs):
             y_test[i,count] = 1 if pairs['test'][i][n][0] == pairs['test'][i][n][2] else 0
             count += 1
     return X_train, y_train, X_val, y_val, X_test, y_test 
+#%%
+def zoom_img(img):
+    return zoom(img, (0.5, 0.5, 1), order = 3)
+    
+#%%
+def progressBar(value, endvalue, bar_length=20):
+    percent = float(value) / endvalue
+    arrow = '-' * int(round(percent * bar_length)-1) + '>'
+    spaces = ' ' * (bar_length - len(arrow))
+
+    sys.stdout.write("\rPercent: [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
+    sys.stdout.flush()

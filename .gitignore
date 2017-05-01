@@ -3,4 +3,5 @@ transformations.pkl
 network_res/
 network_res2/
 best_model/
+old_code/
 *.h5
